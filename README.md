@@ -14,3 +14,17 @@ node --test
 
 ## Deploy
 Push to `main` on `ypriverol/be-the-algorithm` and enable GitHub Pages (root). Static — no Action needed.
+
+## How to extend
+- **Add a question/card:** edit `content.js` (`mcqPool` / `trainingCards`). Run `node --test` — the validator checks it.
+- **Add a mini-game:** create `games/<id>.js` exporting `render(container,{onDone})`; register it in `games/registry.js`; add its `topic` mapping in `buildRounds()` (main.js).
+- **Add a leaderboard later:** replace the body of `submitScore()` in `storage.js` with a `fetch(POST …)`. No other file changes.
+
+## Manual QA checklist
+- [ ] Welcome requires a name; Start advances to Training.
+- [ ] Training cards flip on tap; dots track; "Skip to game" works.
+- [ ] MCQs: timer counts down and auto-answers at 0; correct=green, wrong=red; trap shows "Trap! -50".
+- [ ] All 5 mini-games render, are solvable, and their traps apply a penalty.
+- [ ] Score, streak (🔥), and per-topic bars update correctly.
+- [ ] Results shows tier colour by %, a badge, review list, Play again, Copy score.
+- [ ] Works at a narrow (phone) width — choices stack, SVGs scale.
