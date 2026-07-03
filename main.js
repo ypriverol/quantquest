@@ -1,5 +1,5 @@
 import { trainingCards, TOPICS, mcqPool } from './content.js';
-import { getName, setName, getBest, submitScore } from './storage.js';
+import { getName, setName, getBest, submitScore, fetchLeaderboard } from './storage.js';
 import { blankPerTopic, tierFor, badgeFor } from './score.js';
 import { createRound } from './roundengine.js';
 import { games, gameIds } from './games/registry.js';
@@ -174,14 +174,39 @@ function showResults() {
         <button id="share" class="btn-ghost">Copy my score</button>
       </div>
       <p id="msg" class="muted"></p>
+      <div id="board"></div>
     </div>`);
-  submitScore({ name:state.name, score:state.score, tier:tier.name, perTopic:state.perTopic });
+  submitScore({ name:state.name, score:state.score, tier:tier.name, badge });
   $('#again').onclick = () => go('play');
   $('#share').onclick = async () => {
     const txt = `I scored ${state.score} (${tier.name}, ${badge}) on Be the Algorithm!`;
     try { await navigator.clipboard.writeText(txt); $('#msg').textContent = 'Copied!'; }
     catch { $('#msg').textContent = txt; }
   };
+  renderBoard();
+}
+
+async function renderBoard() {
+  const el = $('#board');
+  if (!el) return;
+  el.innerHTML = '<p class="muted">Loading class board…</p>';
+  const list = await fetchLeaderboard(20);
+  if (list === null) { el.innerHTML = ''; return; }        // board not configured → hide
+  if (!list.length) { el.innerHTML = '<p class="muted">Class board is empty — you could be first!</p>'; return; }
+  let mine = false;
+  const rows = list.map((r, i) => {
+    const you = !mine && r.name === state.name && r.score === state.score;
+    if (you) mine = true;
+    return `<tr class="${you ? 'you' : ''}"><td>${i + 1}</td><td>${esc(r.name)}</td>
+      <td>${r.score}</td><td>${esc(r.tier || '')}</td></tr>`;
+  }).join('');
+  el.innerHTML = `
+    <h2 class="board-h">Class board — top scores</h2>
+    <table class="board"><tr><th>#</th><th>Name</th><th>Score</th><th>Tier</th></tr>${rows}</table>`;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
 function render() {

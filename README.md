@@ -18,7 +18,7 @@ Push to `main` on `ypriverol/be-the-algorithm` and enable GitHub Pages (root). S
 ## How to extend
 - **Add a question/card:** edit `content.js` (`mcqPool` / `trainingCards`). Run `node --test` — the validator checks it.
 - **Add a mini-game:** create `games/<id>.js` exporting `render(container,{onDone})`; register it in `games/registry.js`; add its `topic` mapping in `buildRounds()` (main.js).
-- **Add a leaderboard later:** replace the body of `submitScore()` in `storage.js` with a `fetch(POST …)`. No other file changes.
+- **Shared class leaderboard:** paste your Google Apps Script Web App URL into `config.js` (`LEADERBOARD_URL`). Full 5-minute setup in [docs/leaderboard.md](docs/leaderboard.md). Leave it `''` for local-only scores.
 
 ## Manual QA checklist
 - [ ] Welcome requires a name; Start advances to Training.
