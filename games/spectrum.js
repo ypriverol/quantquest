@@ -100,33 +100,43 @@ export function buildSpectrumSvg(observed, picked = null) {
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
 }
 
-// Fragmentation ladder: the peptide spelled out, with a teal tick above each detected
-// b-ion cut and an orange tick below each detected y-ion cut — so a highlighted peak's
-// b/y label maps to the exact fragment (residues) it represents.
+// Fragment-assignment map: the peptide spelled out, and for every ASSIGNED b/y ion a
+// coloured bracket spanning the exact residues that fragment covers (b from the N-terminus
+// above, y from the C-terminus below) with its ion label. Shows both which fragment each
+// peak is and what was assigned; a decoy lights only the few fragments it can explain.
 export function fragmentLadderSvg(peptide, observed) {
-  const marks = matchIons(observed, peptide).marks;
-  const n = peptide.length, cell = 40, x0 = 24, W = x0 * 2 + n * cell, H = 96, midY = 52;
-  const cx = (i) => x0 + i * cell + cell / 2;       // centre of residue i (0-based)
-  const bound = (k) => x0 + k * cell;                // backbone bond after residue k (1-based)
+  const assigned = matchIons(observed, peptide).marks.filter((m) => m.hit);
+  const n = peptide.length, cell = 46, x0 = 30, lvl = 15;
+  const W = x0 * 2 + n * cell;
+  const bLevels = n - 1, yLevels = n - 1;
+  const topPad = 18, midY = topPad + bLevels * lvl + 20;
+  const H = midY + 22 + yLevels * lvl + 16;
+  const cxi = (i) => x0 + i * cell + cell / 2;     // centre of residue i (0-based)
+  const edge = (k) => x0 + k * cell;               // left edge of residue k (0-based)
   let s = '';
-  // backbone + residues
-  s += `<line x1="${x0 + cell / 2}" y1="${midY}" x2="${W - x0 - cell / 2}" y2="${midY}" stroke="#c7d3d6" stroke-width="2"/>`;
+  // residues on a light backbone
+  s += `<line x1="${cxi(0)}" y1="${midY}" x2="${cxi(n - 1)}" y2="${midY}" stroke="#c7d3d6" stroke-width="2"/>`;
   for (let i = 0; i < n; i++)
-    s += `<text x="${cx(i)}" y="${midY + 6}" text-anchor="middle" font-size="20" font-weight="700" fill="#0A3D52" font-family="ui-monospace,Menlo,monospace">${peptide[i]}</text>`;
-  // detected cuts
-  for (const m of marks) {
-    if (!m.hit) continue;
-    const x = bound(m.cut);
-    if (m.ion[0] === 'b') {
-      s += `<line x1="${x}" y1="${midY - 18}" x2="${x}" y2="${midY - 2}" stroke="${TEAL}" stroke-width="2.5"/>`;
-      s += `<text x="${x + 2}" y="${midY - 22}" text-anchor="middle" font-size="11" font-weight="700" fill="${TEAL}" font-family="system-ui,Arial">${m.ion}</text>`;
-    } else {
-      s += `<line x1="${x}" y1="${midY + 2}" x2="${x}" y2="${midY + 18}" stroke="${ORANGE}" stroke-width="2.5"/>`;
-      s += `<text x="${x - 2}" y="${midY + 32}" text-anchor="middle" font-size="11" font-weight="700" fill="${ORANGE}" font-family="system-ui,Arial">${m.ion}</text>`;
+    s += `<text x="${cxi(i)}" y="${midY + 7}" text-anchor="middle" font-size="21" font-weight="700" fill="#0A3D52" font-family="ui-monospace,Menlo,monospace">${peptide[i]}</text>`;
+  // one bracket per assigned ion, spanning its residues
+  for (const m of assigned) {
+    const k = parseInt(m.ion.slice(1), 10);        // b_k / y_k
+    if (m.ion[0] === 'b') {                          // b_k = first k residues → [edge(0), edge(k)]
+      const xL = edge(0) + 4, xR = edge(k) - 4, y = midY - 20 - (k - 1) * lvl;
+      s += `<line x1="${xL}" y1="${y}" x2="${xR}" y2="${y}" stroke="${TEAL}" stroke-width="2.5"/>`
+        + `<line x1="${xL}" y1="${y}" x2="${xL}" y2="${y + 5}" stroke="${TEAL}" stroke-width="2.5"/>`
+        + `<line x1="${xR}" y1="${y}" x2="${xR}" y2="${y + 5}" stroke="${TEAL}" stroke-width="2.5"/>`
+        + `<text x="${xR + 4}" y="${y + 4}" font-size="11" font-weight="700" fill="${TEAL}" font-family="system-ui,Arial">${m.ion}=${m.frag}</text>`;
+    } else {                                         // y_k = last k residues → [edge(n-k), edge(n)]
+      const xL = edge(n - k) + 4, xR = edge(n) - 4, y = midY + 22 + (k - 1) * lvl;
+      s += `<line x1="${xL}" y1="${y}" x2="${xR}" y2="${y}" stroke="${ORANGE}" stroke-width="2.5"/>`
+        + `<line x1="${xL}" y1="${y}" x2="${xL}" y2="${y - 5}" stroke="${ORANGE}" stroke-width="2.5"/>`
+        + `<line x1="${xR}" y1="${y}" x2="${xR}" y2="${y - 5}" stroke="${ORANGE}" stroke-width="2.5"/>`
+        + `<text x="${xL - 4}" y="${y + 4}" text-anchor="end" font-size="11" font-weight="700" fill="${ORANGE}" font-family="system-ui,Arial">${m.ion}=${m.frag}</text>`;
     }
   }
-  s += `<text x="${x0}" y="14" font-size="10" fill="${TEAL}" font-family="system-ui,Arial">b: from N-terminus →</text>`;
-  s += `<text x="${W - x0}" y="${H - 4}" text-anchor="end" font-size="10" fill="${ORANGE}" font-family="system-ui,Arial">← y: from C-terminus</text>`;
+  s += `<text x="${x0}" y="12" font-size="10" fill="${TEAL}" font-family="system-ui,Arial">b ions (N-term) →</text>`;
+  s += `<text x="${W - x0}" y="${H - 3}" text-anchor="end" font-size="10" fill="${ORANGE}" font-family="system-ui,Arial">← y ions (C-term)</text>`;
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
 }
 
@@ -160,8 +170,8 @@ export function render(container, { onDone }) {
         <span class="chip">Peptide ID (MS2)</span>
         <h2>Which peptide produced this MS2 spectrum?</h2>
         <div class="spectrum">${spectrumSvg()}</div>
-        ${picked ? `<div class="ladder">${fragmentLadderSvg(picked, puzzle.observed)}</div>` : ''}
-        <p class="muted">Click a candidate to overlay its b/y ions and see which fragment each represents. Miss 3 to lose.  <span class="strikes">${dots}</span></p>
+        ${picked ? `<p class="ladder-h">Fragments of <b>${picked}</b> assigned to peaks (b = teal, y = orange):</p><div class="ladder">${fragmentLadderSvg(picked, puzzle.observed)}</div>` : ''}
+        <p class="muted">Click a candidate to overlay its b/y ions and see which fragment each peak is. Miss 3 to lose.  <span class="strikes">${dots}</span></p>
         <div class="choices two">${cands}</div>
         ${verdictBar()}
         <button id="newSpec" class="btn-ghost" style="margin-top:8px">${nextLabel}</button>
