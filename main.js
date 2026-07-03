@@ -1,6 +1,7 @@
 import { trainingCards, TOPICS, mcqPool } from './content.js';
 import { getName, setName, getBest, submitScore } from './storage.js';
-import { computeDelta, blankPerTopic, recordTopic, tierFor, badgeFor } from './score.js';
+import { blankPerTopic, tierFor, badgeFor } from './score.js';
+import { createRound } from './roundengine.js';
 import { games, gameIds } from './games/registry.js';
 
 const app = document.getElementById('app');
@@ -74,7 +75,7 @@ function startPlay() {
   runRound();
 }
 
-let timer = null, timeLeft = 0;
+let timer = null, timeLeft = 0, currentRound = null;
 function hud() {
   return `<div class="hud">
     <span>Q ${state.roundIndex+1}/${state.rounds.length}</span>
@@ -83,6 +84,7 @@ function hud() {
 }
 
 function runRound() {
+  currentRound = createRound();       // new round: completable exactly once
   const r = state.rounds[state.roundIndex];
   if (r.type === 'mcq') return renderMcq(r);
   // game round
@@ -125,10 +127,13 @@ function answerMcq(r, idx, started) {
 }
 
 function finishRound(result, timeFrac = 0) {
-  const delta = computeDelta({ correct:result.correct, penalty:result.penalty, timeFrac, streak:state.streak });
-  state.score += delta;
-  state.streak = result.correct ? state.streak + 1 : 0;
-  recordTopic(state.perTopic, result.topic, result.correct);
+  const outcome = currentRound.complete(state, result, timeFrac);
+  if (!outcome.applied) return;      // one-shot: repeat completion of this round is ignored
+  clearInterval(timer);
+  // freeze inputs so re-clicking a game/choice can't add a 2nd feedback bar
+  app.querySelectorAll('.choice').forEach((b) => { b.disabled = true; });
+  const gh = $('#gameHost'); if (gh) gh.style.pointerEvents = 'none';
+  const delta = outcome.delta;
   const sign = delta >= 0 ? `+${delta}` : `${delta}`;
   const bar = document.createElement('div');
   bar.className = `feedback ${result.correct ? 'ok' : 'no'}`;

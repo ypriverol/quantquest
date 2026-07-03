@@ -42,3 +42,20 @@ test('mbr: correct pairing, decoy must stay unmatched', () => {
   assert.equal(evaluateMbr(bad, d).penalty, true);
   assert.equal(evaluateMbr(bad, d).correct, false);
 });
+
+test('mbr: the trap is REJECTED BY RT, not by m/z', () => {
+  const d = mbrData();
+  const decoy = d.run2.find(r => r.id === d.decoyId);
+  const p2 = d.run1.find(r => r.id === 'P2');
+  const r2 = d.run2.find(r => r.id === 'r2'); // the true match for P2
+  // 1) Every run2 dot exposes a retention time the player can reason about.
+  d.run2.forEach(r => assert.equal(typeof r.rt, 'number'));
+  d.run1.forEach(r => assert.equal(typeof r.rt, 'number'));
+  // 2) The decoy shares P2's EXACT m/z → m/z alone cannot reject it.
+  assert.equal(decoy.mz, p2.mz);
+  // 3) The true match's RT drift is small (~+1 min); the decoy's is far larger → RT rejects it.
+  const trueDrift = r2.rt - p2.rt;          // ~0.9
+  const decoyDrift = decoy.rt - p2.rt;      // ~3.5
+  assert.ok(Math.abs(trueDrift) <= 1.5, 'true match RT drift should be ~1 min');
+  assert.ok(decoyDrift - trueDrift > 1.5, 'decoy RT should be clearly inconsistent with the drift');
+});

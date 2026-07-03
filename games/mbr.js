@@ -1,10 +1,16 @@
 export function mbrData() {
-  // Run1 P1,P2,P3. Run2 has P1',P2' (true matches) + a decoy at P2's m/z but wrong RT.
-  const run1 = [{ id:'P1', mz:650.3 }, { id:'P2', mz:742.9 }, { id:'P3', mz:588.4 }];
+  // Run 2's RT drifted ~+1 min vs Run 1. Each run2 dot carries m/z AND retention time.
+  // The decoy shares P2's EXACT m/z (742.9) — so m/z alone cannot reject it; only its
+  // inconsistent RT (+3.5 min vs the ~+1 min drift) reveals it as a different peptide.
+  const run1 = [
+    { id:'P1', mz:650.3, rt:22.0 },
+    { id:'P2', mz:742.9, rt:31.5 },
+    { id:'P3', mz:588.4, rt:40.2 },
+  ];
   const run2 = [
-    { id:'r1', mz:650.3, match:'P1' },
-    { id:'r2', mz:742.9, match:'P2' },
-    { id:'d',  mz:742.8, match:null },   // decoy: same-ish m/z as P2, wrong RT
+    { id:'r1', mz:650.3, rt:23.1, match:'P1' },  // +1.1 min — consistent drift
+    { id:'r2', mz:742.9, rt:32.4, match:'P2' },  // +0.9 min — consistent drift
+    { id:'d',  mz:742.9, rt:35.0, match:null },  // decoy: SAME m/z as P2, RT +3.5 → wrong peptide
   ];
   return { run1, run2, decoyId:'d' };
 }
@@ -26,16 +32,16 @@ export function render(container, { onDone }) {
   container.innerHTML = `
     <div class="card">
       <span class="chip">Match between runs</span>
-      <h2>Drag each Run-2 dot onto its Run-1 match. RT drifted ~+1 min.</h2>
+      <h2>Run 2's retention time drifted ~+1 min. Drag each Run-2 dot onto the Run-1 peptide with the same m/z AND a consistent RT.</h2>
       <div class="mbr">
         <div class="lane" id="run1"><b>Run 1</b>
-          ${d.run1.map(p=>`<span class="slot" data-p="${p.id}">${p.id}<br><small>${p.mz}</small></span>`).join('')}
+          ${d.run1.map(p=>`<span class="slot" data-p="${p.id}">${p.id}<br><small>m/z ${p.mz}<br>RT ${p.rt.toFixed(1)}</small></span>`).join('')}
         </div>
         <div class="lane" id="run2"><b>Run 2 (drag these)</b>
-          ${d.run2.map(r=>`<span class="dot" draggable="true" data-r="${r.id}">?<br><small>${r.mz}</small></span>`).join('')}
+          ${d.run2.map(r=>`<span class="dot" draggable="true" data-r="${r.id}">?<br><small>m/z ${r.mz}<br>RT ${r.rt.toFixed(1)}</small></span>`).join('')}
         </div>
       </div>
-      <p class="muted">Leave a dot unmatched if nothing fits. One is a trap (same mass, wrong RT).</p>
+      <p class="muted">Two Run-2 dots share m/z 742.9 — only their RT tells them apart. Leave the impostor (wrong RT) unmatched.</p>
       <button id="mbrDone" class="btn-primary">Submit matches</button>
     </div>`;
   let dragged = null;
@@ -57,6 +63,6 @@ export function render(container, { onDone }) {
     for (const r of d.run2) if (!(r.id in assignments)) assignments[r.id] = null;
     const { correct, penalty } = evaluateMbr(assignments, d);
     onDone({ correct, penalty, topic:'mbr',
-      explain: 'P1↔P1 and P2↔P2 match (consistent ~+1 min drift). The decoy has P2\'s mass but wrong RT — a false transfer.' });
+      explain: 'P1 and P2 match with a consistent ~+1 min RT drift (22.0→23.1, 31.5→32.4). The decoy shares P2\'s exact m/z (742.9) but its RT is 35.0 (+3.5 min) — inconsistent, so it\'s a different peptide. Same mass is not enough; RT rejects the false transfer.' });
   };
 }
