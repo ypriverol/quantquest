@@ -192,19 +192,29 @@ async function renderBoard(top = 10) {
   const el = $('#board');
   if (!el) return;
   el.innerHTML = '<p class="muted">Loading class board…</p>';
-  const list = await fetchLeaderboard(top);
-  if (list === null) { el.innerHTML = ''; return; }        // board not configured → hide
+  const data = await fetchLeaderboard(50);                  // one fetch → banner + board
+  if (data === null) { el.innerHTML = ''; return; }         // board not configured → hide
+  const { list, count } = data;
   if (!list.length) { el.innerHTML = '<p class="muted">Class board is empty — you could be first!</p>'; return; }
+  // activity banner (derived from timestamps — "recently active", zero backend change)
+  const now = Date.now();
+  const timed = list.map(r => ({ ...r, t: Date.parse(r.time) })).filter(r => !Number.isNaN(r.t));
+  const lastHour = timed.filter(r => now - r.t < 3600000).length;
+  const latest = [...timed].sort((a, b) => b.t - a.t).slice(0, 4).map(r => esc(r.name)).join(', ');
+  const banner = `<div class="live-banner">🎮 <b>${count}</b> games played`
+    + `${lastHour ? ` · <b>${lastHour}</b> in the last hour` : ''}`
+    + `${latest ? ` · latest: ${latest}` : ''}</div>`;
+  // top-N board (list is already score-sorted)
   let mine = false;
-  const rows = list.map((r, i) => {
+  const rows = list.slice(0, top).map((r, i) => {
     const you = !mine && r.name === state.name && r.score === state.score;
     if (you) mine = true;
     return `<tr class="${you ? 'you' : ''}"><td>${i + 1}</td><td>${esc(r.name)}</td>
       <td>${r.score}</td><td>${esc(r.tier || '')}</td></tr>`;
   }).join('');
-  el.innerHTML = `
-    <h2 class="board-h">Class board — top scores</h2>
-    <table class="board"><tr><th>#</th><th>Name</th><th>Score</th><th>Tier</th></tr>${rows}</table>`;
+  el.innerHTML = banner
+    + `<h2 class="board-h">Class board — top scores</h2>`
+    + `<table class="board"><tr><th>#</th><th>Name</th><th>Score</th><th>Tier</th></tr>${rows}</table>`;
 }
 
 function esc(s) {

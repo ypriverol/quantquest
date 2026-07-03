@@ -47,7 +47,9 @@ details{width:100%;max-width:520px;text-align:left}
 .strikes{display:inline-flex;gap:5px;vertical-align:middle;margin-left:4px}
 .sdot{width:11px;height:11px;border-radius:50%;background:#cdd7da;display:inline-block}
 .sdot.miss{background:var(--red)}
-.board-h{margin:18px 0 8px;font-size:18px}
+.live-banner{margin:14px 0 6px;padding:8px 14px;border-radius:999px;background:var(--teal-l);color:var(--teal-d);font-size:14px;display:inline-block}
+.live-banner b{color:var(--orange)}
+.board-h{margin:14px 0 8px;font-size:18px}
 .board{border-collapse:collapse;width:100%;max-width:520px}
 .board th,.board td{border-bottom:1px solid #dce4e6;padding:6px 10px;text-align:left;font-size:14px}
 .board th{color:var(--teal-d)}

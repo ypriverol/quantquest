@@ -28,14 +28,15 @@ export function submitScore({ name, score, tier, badge }) {
   return { ok: true, mode: 'local' };
 }
 
-// Fetch the top scores for the results board.
-// Returns null if the board isn't configured, [] on error, else an array of
-// { name, score, tier, badge, time } sorted highest-first.
-export async function fetchLeaderboard(top = 20) {
+// Fetch scores for the board + activity banner.
+// Returns null if the board isn't configured, else { list, count }:
+//   list  = up to `top` rows { name, score, tier, badge, time } sorted highest-first
+//   count = total games ever recorded
+export async function fetchLeaderboard(top = 50) {
   if (!LEADERBOARD_URL) return null;
   try {
     const res = await fetch(`${LEADERBOARD_URL}?top=${top}`);
     const data = await res.json();
-    return Array.isArray(data.top) ? data.top : [];
-  } catch { return []; }
+    return { list: Array.isArray(data.top) ? data.top : [], count: Number(data.count) || 0 };
+  } catch { return { list: [], count: 0 }; }
 }
