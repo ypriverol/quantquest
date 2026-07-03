@@ -1,6 +1,6 @@
 import { trainingCards, TOPICS, mcqPool } from './content.js';
-import { getName, setName, getBest } from './storage.js';
-import { computeDelta, blankPerTopic, recordTopic } from './score.js';
+import { getName, setName, getBest, submitScore } from './storage.js';
+import { computeDelta, blankPerTopic, recordTopic, tierFor, badgeFor } from './score.js';
 
 const app = document.getElementById('app');
 const mount = (html) => { app.innerHTML = html; };
@@ -133,11 +133,46 @@ function nextRound() {
   else go('results');
 }
 
+function maxScore() { return state.rounds.length * 150; } // 100 base + 50 speed, mult ignored for a stable %
+
+function showResults() {
+  const pct = Math.round(100 * state.score / Math.max(1, maxScore()));
+  const tier = tierFor(pct); const badge = badgeFor(state.perTopic);
+  const bars = Object.entries(state.perTopic).filter(([,v])=>v.seen).map(([t,v])=>{
+    const a = Math.round(100*v.correct/v.seen);
+    return `<div class="trow"><span>${TOPICS[t].label}</span>
+      <span class="track"><span class="fill" style="width:${a}%"></span></span><span>${a}%</span></div>`;
+  }).join('');
+  const review = Object.entries(state.perTopic).filter(([,v])=>v.seen && v.correct/v.seen < 0.6)
+    .map(([t])=>`<li>${TOPICS[t].label}: ${TOPICS[t].review}</li>`).join('') || '<li>Nice — nothing flagged to review!</li>';
+  mount(`
+    <div class="card center">
+      <span class="chip">${state.name}</span>
+      <h1>${state.score} pts</h1>
+      <div class="tier ${tier.cls}">${tier.name}</div>
+      <p>Badge: <b>${badge}</b></p>
+      <div class="bars">${bars}</div>
+      <details><summary>What to review</summary><ul>${review}</ul></details>
+      <div class="center" style="gap:10px">
+        <button id="again" class="btn-primary">Play again ➔</button>
+        <button id="share" class="btn-ghost">Copy my score</button>
+      </div>
+      <p id="msg" class="muted"></p>
+    </div>`);
+  submitScore({ name:state.name, score:state.score, tier:tier.name, perTopic:state.perTopic });
+  $('#again').onclick = () => go('play');
+  $('#share').onclick = async () => {
+    const txt = `I scored ${state.score} (${tier.name}, ${badge}) on Be the Algorithm!`;
+    try { await navigator.clipboard.writeText(txt); $('#msg').textContent = 'Copied!'; }
+    catch { $('#msg').textContent = txt; }
+  };
+}
+
 function render() {
   if (state.screen === 'welcome') return showWelcome();
   if (state.screen === 'training') return showTraining();
   if (state.screen === 'play') return startPlay();
-  if (state.screen === 'results') return mount('<div class="card center"><p>Results — Task 9.</p></div>');
+  if (state.screen === 'results') return showResults();
 }
 
 render();
