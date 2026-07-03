@@ -23,9 +23,11 @@ export function ionSeries(peptide) {
   const n = m.length;
   const b = [], y = [];
   let acc = 0;
-  for (let i = 0; i < n - 1; i++) { acc += m[i]; b.push({ ion: `b${i + 1}`, mz: r3(acc + PROTON) }); }
+  // b_i = the first i residues (N-terminal fragment)
+  for (let i = 0; i < n - 1; i++) { acc += m[i]; b.push({ ion: `b${i + 1}`, mz: r3(acc + PROTON), frag: peptide.slice(0, i + 1), cut: i + 1 }); }
   acc = 0;
-  for (let j = 0; j < n - 1; j++) { acc += m[n - 1 - j]; y.push({ ion: `y${j + 1}`, mz: r3(acc + WATER + PROTON) }); }
+  // y_j = the last j residues (C-terminal fragment)
+  for (let j = 0; j < n - 1; j++) { acc += m[n - 1 - j]; y.push({ ion: `y${j + 1}`, mz: r3(acc + WATER + PROTON), frag: peptide.slice(n - (j + 1)), cut: n - (j + 1) }); }
   return { b, y };
 }
 
@@ -43,7 +45,8 @@ export function observedMz(peptide) {
 // and per-ion marks (hit = a peak exists within tol).
 export function matchIons(observedList, peptide, tol = 0.3) {
   const marks = allIons(peptide).map((p) => ({
-    ion: p.ion, mz: p.mz, hit: observedList.some((o) => Math.abs(o - p.mz) <= tol),
+    ion: p.ion, mz: p.mz, frag: p.frag, cut: p.cut,
+    hit: observedList.some((o) => Math.abs(o - p.mz) <= tol),
   }));
   return { matched: marks.filter((m) => m.hit).length, total: marks.length, marks };
 }
@@ -72,7 +75,7 @@ const stableHeight = (mz) => 0.55 + 0.4 * ((Math.sin(mz * 12.9898) + 1) / 2); //
 // Draw the observed spectrum; if `picked` (a peptide) is given, overlay its b/y matches
 // (coloured, labelled) and its predicted-but-absent ions (grey ticks at the baseline).
 export function buildSpectrumSvg(observed, picked = null) {
-  const W = 620, H = 210, x0 = 44, x1 = W - 16, base = H - 34, top = 22;
+  const W = 620, H = 238, x0 = 44, x1 = W - 16, base = H - 58, top = 22;
   const lo = observed[0] - 30, hi = observed[observed.length - 1] + 30;
   const X = (mz) => x0 + (x1 - x0) * (mz - lo) / (hi - lo);
   const marks = picked ? matchIons(observed, picked).marks : [];
@@ -82,17 +85,48 @@ export function buildSpectrumSvg(observed, picked = null) {
   };
   let s = '';
   for (const mz of observed) {
+    const x = X(mz);
     const y1 = base - stableHeight(mz) * (base - top);
     const h = hitFor(mz);
-    s += `<line x1="${X(mz)}" y1="${base}" x2="${X(mz)}" y2="${y1}" stroke="${h ? h.color : SLATE}" stroke-width="${h ? 3 : 2}" stroke-linecap="round"/>`;
-    if (h) s += `<text x="${X(mz)}" y="${y1 - 5}" text-anchor="middle" font-size="11" font-weight="700" fill="${h.color}" font-family="system-ui,Arial">${h.label}</text>`;
+    s += `<line x1="${x}" y1="${base}" x2="${x}" y2="${y1}" stroke="${h ? h.color : SLATE}" stroke-width="${h ? 3 : 2}" stroke-linecap="round"/>`;
+    if (h) s += `<text x="${x}" y="${y1 - 5}" text-anchor="middle" font-size="11" font-weight="700" fill="${h.color}" font-family="system-ui,Arial">${h.label}</text>`;
+    // per-peak m/z label on the x-axis (angled to avoid overlap)
+    s += `<text x="${x}" y="${base + 12}" transform="rotate(-55 ${x} ${base + 12})" text-anchor="end" font-size="9.5" fill="#7a8890" font-family="system-ui,Arial">${Math.round(mz)}</text>`;
   }
   if (picked) for (const mk of marks) if (!mk.hit)
-    s += `<polygon points="${X(mk.mz)},${base + 2} ${X(mk.mz) - 4},${base + 10} ${X(mk.mz) + 4},${base + 10}" fill="${GREY}"/>`;
+    s += `<polygon points="${X(mk.mz)},${base + 2} ${X(mk.mz) - 4},${base + 9} ${X(mk.mz) + 4},${base + 9}" fill="${GREY}"/>`;
   s += `<line x1="${x0}" y1="${base}" x2="${x1}" y2="${base}" stroke="#c7d3d6" stroke-width="1"/>`;
-  s += `<text x="${(x0 + x1) / 2}" y="${base + 24}" text-anchor="middle" font-size="12" fill="${DARK}" font-family="system-ui,Arial">m/z</text>`;
-  s += `<text x="${x0}" y="${base + 24}" text-anchor="start" font-size="10" fill="#7a8890" font-family="system-ui,Arial">${Math.round(lo)}</text>`;
-  s += `<text x="${x1}" y="${base + 24}" text-anchor="end" font-size="10" fill="#7a8890" font-family="system-ui,Arial">${Math.round(hi)}</text>`;
+  s += `<text x="${(x0 + x1) / 2}" y="${H - 4}" text-anchor="middle" font-size="12" fill="${DARK}" font-weight="700" font-family="system-ui,Arial">m/z</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+}
+
+// Fragmentation ladder: the peptide spelled out, with a teal tick above each detected
+// b-ion cut and an orange tick below each detected y-ion cut — so a highlighted peak's
+// b/y label maps to the exact fragment (residues) it represents.
+export function fragmentLadderSvg(peptide, observed) {
+  const marks = matchIons(observed, peptide).marks;
+  const n = peptide.length, cell = 40, x0 = 24, W = x0 * 2 + n * cell, H = 96, midY = 52;
+  const cx = (i) => x0 + i * cell + cell / 2;       // centre of residue i (0-based)
+  const bound = (k) => x0 + k * cell;                // backbone bond after residue k (1-based)
+  let s = '';
+  // backbone + residues
+  s += `<line x1="${x0 + cell / 2}" y1="${midY}" x2="${W - x0 - cell / 2}" y2="${midY}" stroke="#c7d3d6" stroke-width="2"/>`;
+  for (let i = 0; i < n; i++)
+    s += `<text x="${cx(i)}" y="${midY + 6}" text-anchor="middle" font-size="20" font-weight="700" fill="#0A3D52" font-family="ui-monospace,Menlo,monospace">${peptide[i]}</text>`;
+  // detected cuts
+  for (const m of marks) {
+    if (!m.hit) continue;
+    const x = bound(m.cut);
+    if (m.ion[0] === 'b') {
+      s += `<line x1="${x}" y1="${midY - 18}" x2="${x}" y2="${midY - 2}" stroke="${TEAL}" stroke-width="2.5"/>`;
+      s += `<text x="${x + 2}" y="${midY - 22}" text-anchor="middle" font-size="11" font-weight="700" fill="${TEAL}" font-family="system-ui,Arial">${m.ion}</text>`;
+    } else {
+      s += `<line x1="${x}" y1="${midY + 2}" x2="${x}" y2="${midY + 18}" stroke="${ORANGE}" stroke-width="2.5"/>`;
+      s += `<text x="${x - 2}" y="${midY + 32}" text-anchor="middle" font-size="11" font-weight="700" fill="${ORANGE}" font-family="system-ui,Arial">${m.ion}</text>`;
+    }
+  }
+  s += `<text x="${x0}" y="14" font-size="10" fill="${TEAL}" font-family="system-ui,Arial">b: from N-terminus →</text>`;
+  s += `<text x="${W - x0}" y="${H - 4}" text-anchor="end" font-size="10" fill="${ORANGE}" font-family="system-ui,Arial">← y: from C-terminus</text>`;
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
 }
 
@@ -126,7 +160,8 @@ export function render(container, { onDone }) {
         <span class="chip">Peptide ID (MS2)</span>
         <h2>Which peptide produced this MS2 spectrum?</h2>
         <div class="spectrum">${spectrumSvg()}</div>
-        <p class="muted">Click a candidate to overlay its b/y ions. Miss 3 to lose.  <span class="strikes">${dots}</span></p>
+        ${picked ? `<div class="ladder">${fragmentLadderSvg(picked, puzzle.observed)}</div>` : ''}
+        <p class="muted">Click a candidate to overlay its b/y ions and see which fragment each represents. Miss 3 to lose.  <span class="strikes">${dots}</span></p>
         <div class="choices two">${cands}</div>
         ${verdictBar()}
         <button id="newSpec" class="btn-ghost" style="margin-top:8px">${nextLabel}</button>

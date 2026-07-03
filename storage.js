@@ -8,6 +8,10 @@ export const setName = (s) => LS()?.setItem(K_NAME, s);
 export const getBest = () => Number(LS()?.getItem(K_BEST) || 0);
 export const setBest = (n) => { if (n > getBest()) LS()?.setItem(K_BEST, n); };
 
+// Welcome-screen board visibility preference (default: shown).
+export const getHideBoard = () => LS()?.getItem('bta.hideBoard') === '1';
+export const setHideBoard = (v) => LS()?.setItem('bta.hideBoard', v ? '1' : '0');
+
 // Save the score. Always keeps a local best; when LEADERBOARD_URL is set, also fires a
 // best-effort POST to the shared board (fire-and-forget, mode:'no-cors' to avoid a CORS
 // preflight with Apps Script — we don't need to read the response).

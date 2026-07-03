@@ -1,5 +1,5 @@
 import { trainingCards, TOPICS, mcqPool } from './content.js';
-import { getName, setName, getBest, submitScore, fetchLeaderboard } from './storage.js';
+import { getName, setName, getBest, submitScore, fetchLeaderboard, getHideBoard, setHideBoard } from './storage.js';
 import { blankPerTopic, tierFor, badgeFor } from './score.js';
 import { createRound } from './roundengine.js';
 import { games, gameIds } from './games/registry.js';
@@ -19,6 +19,7 @@ function go(screen) { state.screen = screen; render(); }
 
 function showWelcome() {
   const best = getBest();
+  const hidden = getHideBoard();
   mount(`
     <div class="card center">
       <h1>QuantQuest</h1>
@@ -26,14 +27,25 @@ function showWelcome() {
       <input id="name" class="name" placeholder="Your name" value="${state.name || ''}" maxlength="24" />
       ${best ? `<p class="muted">Your best: ${best}</p>` : ''}
       <button id="start" class="btn-primary">Start training ➔</button>
-      <div id="board"></div>
+      <div class="board-wrap">
+        <button id="boardToggle" class="btn-ghost small">${hidden ? '🏆 Show board' : '🏆 Hide board'}</button>
+        <div id="board" ${hidden ? 'style="display:none"' : ''}></div>
+      </div>
     </div>`);
   $('#start').onclick = () => {
     const v = $('#name').value.trim();
     if (!v) { $('#name').focus(); return; }
     state.name = v; setName(v); go('training');
   };
-  renderBoard(10);
+  $('#boardToggle').onclick = () => {
+    const board = $('#board');
+    const willHide = board.style.display !== 'none';
+    board.style.display = willHide ? 'none' : '';
+    $('#boardToggle').textContent = willHide ? '🏆 Show board' : '🏆 Hide board';
+    setHideBoard(willHide);
+    if (!willHide) renderBoard(10);
+  };
+  if (!hidden) renderBoard(10);
 }
 
 let cardIdx = 0;
