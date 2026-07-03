@@ -57,8 +57,7 @@ function showTraining() {
 
 function buildRounds() {
   const mcq = shuffle(mcqPool).slice(0, 8).map((m) => ({ type:'mcq', ...m }));
-  const gameRounds = shuffle(gameIds).map((id) => ({ type:'game', gameId:id,
-    topic: ({envelope:'feature',feature:'feature',method:'methods',detective:'missing',mbr:'mbr'})[id] }));
+  const gameRounds = shuffle(gameIds).map((id) => ({ type:'game', gameId:id }));
   // interleave: game, then ~2 mcq, repeat
   const rounds = []; let gi = 0, mi = 0;
   while (gi < gameRounds.length || mi < mcq.length) {
@@ -79,7 +78,7 @@ let timer = null, timeLeft = 0;
 function hud() {
   return `<div class="hud">
     <span>Q ${state.roundIndex+1}/${state.rounds.length}</span>
-    <span id="clock">⏱ ${timeLeft}s</span>
+    <span id="clock">${(() => { const r = state.rounds[state.roundIndex]; return r && r.type === 'mcq' ? `⏱ ${timeLeft}s` : '·'; })()}</span>
     <span>Score ${state.score} · 🔥${state.streak}</span></div>`;
 }
 
