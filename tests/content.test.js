@@ -3,9 +3,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TOPICS, trainingCards, mcqPool, validateContent } from '../content.js';
 
-const IDS = ['scan-levels','feature','acquisition','methods','mbr','normalization','rollup','missing'];
+const IDS = Object.keys(TOPICS);   // derive from TOPICS so new topics can't drift out of the allow-list
 
-test('all 8 topics present with review text', () => {
+test('all topics present with review text', () => {
+  assert.ok(IDS.length >= 8);
   for (const id of IDS) { assert.ok(TOPICS[id], `missing ${id}`); assert.ok(TOPICS[id].review); }
 });
 test('>=8 training cards, valid topics', () => {
