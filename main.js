@@ -117,12 +117,25 @@ function renderMcq(r) {
       <div class="choices">${r.choices.map((c,i)=>`<button class="choice" data-i="${i}">${c}</button>`).join('')}</div>
     </div>`);
   clearInterval(timer);
+  // pause the clock while the window is unfocused, so switching windows can't time you out
+  let paused = false;
+  const onBlur = () => { paused = true; };
+  const onFocus = () => { paused = false; };
+  window.addEventListener('blur', onBlur);
+  window.addEventListener('focus', onFocus);
+  const cleanup = () => { window.removeEventListener('blur', onBlur); window.removeEventListener('focus', onFocus); };
   timer = setInterval(() => {
+    if (paused) return;
     timeLeft -= 1; const el = $('#clock'); if (el) el.textContent = `⏱ ${Math.max(0,timeLeft)}s`;
-    if (timeLeft <= 0) { clearInterval(timer); answerMcq(r, -1, started); }
+    if (timeLeft <= 0) { clearInterval(timer); cleanup(); answerMcq(r, -1, started); }
   }, 1000);
   app.querySelectorAll('.choice').forEach((b) =>
-    b.onclick = () => answerMcq(r, Number(b.dataset.i), started));
+    b.onclick = () => {
+      // ignore a click that is really the release of a text drag-selection (e.g. selecting the question)
+      if (typeof window.getSelection === 'function' && String(window.getSelection()).trim()) return;
+      clearInterval(timer); cleanup();
+      answerMcq(r, Number(b.dataset.i), started);
+    });
 }
 
 function answerMcq(r, idx, started) {
